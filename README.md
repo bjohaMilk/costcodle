@@ -3,7 +3,7 @@
 <!-- PROJECT LOGO -->
 <br />
 <div align="center">
-  <a href="https://costcodle.com">
+  <a href="https://bjohamilk.github.io/costcodle/">
     <img src="assets/CD.png" alt="Logo" width="80" height="80">
   </a>
 
@@ -15,7 +15,7 @@
     <a href="https://github.com/KermWasTaken/costcodle"><strong>Explore the docs »</strong></a>
     <br />
     <br />
-    <a href="https://costcodle.com">View Demo</a>
+    <a href="https://bjohamilk.github.io/costcodle/">View Demo</a>
     ·
     <a href="https://github.com/KermWasTaken/costcodle/issues">Report Bug</a>
     ·
@@ -46,7 +46,7 @@
 <!-- ABOUT THE PROJECT -->
 ## About The Project
 
-[![Product Name Screen Shot][product-screenshot]](https://costcodle.com)
+[![Product Name Screen Shot][product-screenshot]](https://bjohamilk.github.io/costcodle/)
 
 Guess the COSTCODLE in 6 tries.
 
