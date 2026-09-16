@@ -176,13 +176,49 @@ test("a fixed random link loads that item and does not change daily statistics",
   context.checkGuess("10.00");
 
   assert.match(elements.get("product-info").innerHTML, /First product/);
-  assert.equal(JSON.parse(sessionStorage.getItem("randomState")).hasWon, true);
+  const randomState = JSON.parse(sessionStorage.getItem("randomState"));
+  assert.equal(randomState.hasWon, true);
+  assert.equal(randomState.winMessage, "Great job, Sean!");
+  assert.match(elements.get("game-stats").innerHTML, /Great job, Sean!/);
+  assert.doesNotMatch(elements.get("game-stats").innerHTML, /You win/);
   assert.equal(localStorage.getItem("stats"), existingStats);
   const randomStats = JSON.parse(localStorage.getItem("randomStats"));
   assert.equal(randomStats.numGames, 1);
   assert.equal(randomStats.numWins, 1);
   assert.equal(randomStats.currentStreak, 1);
   assert.equal(randomStats.winsInNum[0], 1);
+});
+
+test("a winning message remains the same after refresh", async () => {
+  const randomState = JSON.stringify({
+    gameNumber: 1,
+    guesses: [{ guess: "10.00", closeness: "guess-win", direction: "&check;" }],
+    hasWon: true,
+    winMessage: "Right on the money, Sean!",
+  });
+  const randomStats = JSON.stringify({
+    numGames: 1,
+    numWins: 1,
+    winsInNum: [1, 0, 0, 0, 0, 0],
+    currentStreak: 1,
+    maxStreak: 1,
+  });
+  const { elements, sessionStorage } = await loadGame({
+    games,
+    localValues: { randomStats },
+    search: "?mode=random&game=1",
+    sessionValues: { randomState },
+    randomValue: 0,
+  });
+
+  assert.match(
+    elements.get("game-stats").innerHTML,
+    /Right on the money, Sean!/
+  );
+  assert.equal(
+    JSON.parse(sessionStorage.getItem("randomState")).winMessage,
+    "Right on the money, Sean!"
+  );
 });
 
 test("random mode restores its current game after a refresh", async () => {

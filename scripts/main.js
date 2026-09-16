@@ -25,6 +25,24 @@ const isRandomMode = urlParams.get("mode") === "random";
 const gameStateStorage = isRandomMode ? sessionStorage : localStorage;
 const gameStateStorageKey = isRandomMode ? "randomState" : "state";
 const statsStorageKey = isRandomMode ? "randomStats" : "stats";
+const seanCongratulations = [
+  "Great job, Sean!",
+  "Nice going, Sean!",
+  "Way to go, Sean!",
+  "Nailed it, Sean!",
+  "Excellent guess, Sean!",
+  "You got it, Sean!",
+  "Spot on, Sean!",
+  "Price-perfect, Sean!",
+  "Brilliant work, Sean!",
+  "Well played, Sean!",
+  "That's a winner, Sean!",
+  "Impressive, Sean!",
+  "Fantastic job, Sean!",
+  "Right on the money, Sean!",
+  "Costco champion, Sean!",
+  "Superb guessing, Sean!",
+];
 
 //Elements with event listeners to play the game
 const input = document.getElementById("guess-input");
@@ -50,6 +68,7 @@ let gameState = JSON.parse(gameStateStorage.getItem(gameStateStorageKey)) || {
   gameNumber: -1,
   guesses: [],
   hasWon: false,
+  winMessage: "",
 };
 
 /*
@@ -196,6 +215,7 @@ function initializeGame() {
     gameState.gameNumber = activeGameNumber;
     gameState.guesses = [];
     gameState.hasWon = false;
+    gameState.winMessage = "";
 
     userStats.numGames++;
     saveStats();
@@ -273,7 +293,7 @@ function updateGuessStat() {
     ? `Game #${activeGameNumber} · `
     : `Daily #${activeGameNumber} · `;
   if (gameState.hasWon) {
-    guessStats.innerHTML = `<center>${modeLabel}You win! Congratulations!🎉</center>`;
+    guessStats.innerHTML = `<center>${modeLabel}${getWinMessage()} 🎉</center>`;
     guessStats.innerHTML += `<center>The price was $${productPrice}</center>`;
     return;
   }
@@ -284,6 +304,18 @@ function updateGuessStat() {
   } else {
     guessStats.innerHTML = `${modeLabel}Guess: ${gameState.guesses.length + 1}/6`;
   }
+}
+
+function getWinMessage() {
+  if (!gameState.winMessage) {
+    gameState.winMessage =
+      seanCongratulations[
+        Math.floor(Math.random() * seanCongratulations.length)
+      ];
+    saveGameState();
+  }
+
+  return gameState.winMessage;
 }
 
 /*
