@@ -109,6 +109,23 @@
             RANDOM ITEM
           </button>
         </div>
+        <div id="game-number-controls">
+          <label for="game-number-input">GAME #</label>
+          <input
+            id="game-number-input"
+            type="number"
+            min="1"
+            step="1"
+            inputmode="numeric"
+            placeholder="#"
+          />
+          <button id="play-game-button" class="game-mode-button" type="button">
+            PLAY
+          </button>
+        </div>
+        <div id="game-number-error" class="game-number-error hide" role="alert">
+          Enter a valid game number.
+        </div>
         <div id="game-stats"></div>
         <div id="guesses-container">
           <div id="warning-toast" class="animate__animated hide">
@@ -316,6 +333,10 @@
                 <div id="graph-6" class="graphElem"></div>
               </div>
             </div>
+            <section id="history-section">
+              <p>GAME HISTORY</p>
+              <div id="game-history"></div>
+            </section>
           </div>
         </div>
       </main>

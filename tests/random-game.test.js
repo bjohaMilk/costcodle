@@ -33,6 +33,7 @@ function createElement() {
 
   return {
     children: [],
+    dataset: {},
     classList: {
       add: (...classNames) => classNames.forEach((name) => classes.add(name)),
       contains: (className) => classes.has(className),
@@ -49,6 +50,9 @@ function createElement() {
     },
     click() {
       listeners.get("click")?.({ currentTarget: this });
+    },
+    dispatch(eventName, event = {}) {
+      listeners.get(eventName)?.(event);
     },
     removeEventListener(eventName) {
       listeners.delete(eventName);
@@ -151,6 +155,7 @@ test("random mode selects from every available game and stores session progress"
   assert.equal(JSON.parse(sessionStorage.getItem("randomState")).gameNumber, 3399);
   assert.equal(localStorage.getItem("state"), null);
   assert.equal(localStorage.getItem("stats"), null);
+  assert.equal(JSON.parse(localStorage.getItem("randomStats")).numGames, 1);
   assert.match(location.replaced, /mode=random&game=3399/);
 });
 
@@ -173,6 +178,11 @@ test("a fixed random link loads that item and does not change daily statistics",
   assert.match(elements.get("product-info").innerHTML, /First product/);
   assert.equal(JSON.parse(sessionStorage.getItem("randomState")).hasWon, true);
   assert.equal(localStorage.getItem("stats"), existingStats);
+  const randomStats = JSON.parse(localStorage.getItem("randomStats"));
+  assert.equal(randomStats.numGames, 1);
+  assert.equal(randomStats.numWins, 1);
+  assert.equal(randomStats.currentStreak, 1);
+  assert.equal(randomStats.winsInNum[0], 1);
 });
 
 test("random mode restores its current game after a refresh", async () => {
@@ -181,8 +191,16 @@ test("random mode restores its current game after a refresh", async () => {
     guesses: [{ guess: "5.00", closeness: "guess-far", direction: "&uarr;" }],
     hasWon: false,
   });
-  const { elements, sessionStorage } = await loadGame({
+  const randomStats = JSON.stringify({
+    numGames: 1,
+    numWins: 0,
+    winsInNum: [0, 0, 0, 0, 0, 0],
+    currentStreak: 0,
+    maxStreak: 0,
+  });
+  const { elements, localStorage, sessionStorage } = await loadGame({
     games,
+    localValues: { randomStats },
     search: "?mode=random",
     sessionValues: { randomState },
     randomValue: 0.999,
@@ -190,6 +208,7 @@ test("random mode restores its current game after a refresh", async () => {
 
   assert.match(elements.get("product-info").innerHTML, /First product/);
   assert.equal(JSON.parse(sessionStorage.getItem("randomState")).guesses.length, 1);
+  assert.equal(localStorage.getItem("randomStats"), randomStats);
 });
 
 test("mode controls navigate to a fresh random game and back to the daily game", async () => {
@@ -204,6 +223,53 @@ test("mode controls navigate to a fresh random game and back to the daily game",
 
   elements.get("daily-game-button").click();
   assert.equal(location.assigned, "/index.html");
+});
+
+test("the game number control opens a specific valid game", async () => {
+  const { elements, location, sessionStorage } = await loadGame({
+    games,
+    search: "?mode=random&game=1",
+  });
+
+  elements.get("game-number-input").value = "3399";
+  elements.get("play-game-button").click();
+
+  assert.equal(sessionStorage.getItem("randomState"), null);
+  assert.equal(location.assigned, "/index.html?mode=random&game=3399");
+});
+
+test("the game number control rejects unavailable games", async () => {
+  const { elements, location } = await loadGame({
+    games,
+    search: "?mode=random&game=1",
+  });
+
+  elements.get("game-number-input").value = "3400";
+  elements.get("play-game-button").click();
+
+  assert.equal(location.assigned, null);
+  assert.equal(elements.get("game-number-error").classList.contains("hide"), false);
+});
+
+test("existing random progress is migrated into random statistics", async () => {
+  const randomState = JSON.stringify({
+    gameNumber: 1,
+    guesses: [{ guess: "10.00", closeness: "guess-win", direction: "&check;" }],
+    hasWon: true,
+  });
+  const { localStorage } = await loadGame({
+    games,
+    search: "?mode=random&game=1",
+    sessionValues: { randomState },
+  });
+
+  const randomStats = JSON.parse(localStorage.getItem("randomStats"));
+  assert.equal(randomStats.numGames, 1);
+  assert.equal(randomStats.numWins, 1);
+  assert.equal(randomStats.winsInNum[0], 1);
+  const history = JSON.parse(localStorage.getItem("gameHistory"));
+  assert.equal(history.length, 1);
+  assert.equal(history[0].result, "won");
 });
 
 test("daily mode continues to store progress and update daily statistics", async () => {
@@ -230,4 +296,103 @@ test("daily mode continues to store progress and update daily statistics", async
   assert.equal(stats.numGames, 1);
   assert.equal(stats.numWins, 1);
   assert.equal(sessionStorage.getItem("randomState"), null);
+});
+
+test("random losses update random stats without changing daily stats", async () => {
+  const dailyStats = JSON.stringify({
+    numGames: 3,
+    numWins: 3,
+    winsInNum: [3, 0, 0, 0, 0, 0],
+    currentStreak: 3,
+    maxStreak: 3,
+  });
+  const { context, localStorage } = await loadGame({
+    games,
+    localValues: { stats: dailyStats },
+    search: "?mode=random&game=1",
+  });
+
+  for (let guessNumber = 0; guessNumber < 6; guessNumber++) {
+    context.checkGuess("1.00");
+  }
+
+  const randomStats = JSON.parse(localStorage.getItem("randomStats"));
+  assert.equal(randomStats.numGames, 1);
+  assert.equal(randomStats.numWins, 0);
+  assert.equal(randomStats.currentStreak, 0);
+  assert.equal(localStorage.getItem("stats"), dailyStats);
+  const history = JSON.parse(localStorage.getItem("gameHistory"));
+  assert.equal(history.length, 1);
+  assert.equal(history[0].gameNumber, 1);
+  assert.equal(history[0].productName, "First product");
+  assert.equal(history[0].mode, "random");
+  assert.equal(history[0].result, "lost");
+  assert.equal(history[0].guesses, 6);
+});
+
+test("the stats overlay renders statistics for the active mode", async () => {
+  const randomStats = JSON.stringify({
+    numGames: 4,
+    numWins: 3,
+    winsInNum: [1, 2, 0, 0, 0, 0],
+    currentStreak: 2,
+    maxStreak: 3,
+  });
+  const randomState = JSON.stringify({
+    gameNumber: 1,
+    guesses: [],
+    hasWon: false,
+  });
+  const { elements } = await loadGame({
+    games,
+    localValues: { randomStats },
+    search: "?mode=random&game=1",
+    sessionValues: { randomState },
+  });
+
+  elements.get("stat-button").dataset.overlay = "stats-overlay";
+  elements.get("stat-button").click();
+
+  assert.match(elements.get("title").innerHTML, /RANDOM/);
+  assert.equal(elements.get("number-wins").innerHTML, "4");
+  assert.equal(elements.get("win-percent").innerHTML, "75");
+  assert.equal(elements.get("current-streak").innerHTML, "2");
+  assert.equal(elements.get("max-streak").innerHTML, "3");
+  assert.equal(elements.get("graph-1").innerHTML, "1");
+  assert.equal(elements.get("graph-2").innerHTML, "2");
+});
+
+test("game history renders completed games with replay controls", async () => {
+  const gameHistory = JSON.stringify([
+    {
+      gameNumber: 3399,
+      productName: "Last product",
+      mode: "random",
+      result: "won",
+      guesses: 2,
+      completedAt: "2026-09-15T12:00:00.000Z",
+    },
+  ]);
+  const randomState = JSON.stringify({
+    gameNumber: 1,
+    guesses: [],
+    hasWon: false,
+  });
+  const { elements, location } = await loadGame({
+    games,
+    localValues: { gameHistory },
+    search: "?mode=random&game=1",
+    sessionValues: { randomState },
+  });
+
+  elements.get("stat-button").dataset.overlay = "stats-overlay";
+  elements.get("stat-button").click();
+
+  const historyRows = elements.get("game-history").children;
+  assert.equal(historyRows.length, 1);
+  assert.equal(historyRows[0].children[0].textContent, "#3399");
+  assert.match(historyRows[0].children[1].textContent, /Last product/);
+
+  historyRows[0].children[0].click();
+  assert.equal(location.assigned, "/index.html?mode=random&game=3399");
 });

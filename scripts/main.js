@@ -24,6 +24,7 @@ const urlParams = new URLSearchParams(window.location.search);
 const isRandomMode = urlParams.get("mode") === "random";
 const gameStateStorage = isRandomMode ? sessionStorage : localStorage;
 const gameStateStorageKey = isRandomMode ? "randomState" : "state";
+const statsStorageKey = isRandomMode ? "randomStats" : "stats";
 
 //Elements with event listeners to play the game
 const input = document.getElementById("guess-input");
@@ -35,8 +36,8 @@ infoButton.addEventListener("click", switchState);
 const statButton = document.getElementById("stat-button");
 statButton.addEventListener("click", switchState);
 
-//User stats object
-const userStats = JSON.parse(localStorage.getItem("stats")) || {
+//Stats for the active game mode
+const userStats = JSON.parse(localStorage.getItem(statsStorageKey)) || {
   numGames: 0,
   numWins: 0,
   winsInNum: [0, 0, 0, 0, 0, 0],
@@ -90,7 +91,7 @@ function fetchGameData() {
       }
 
       initializeGame();
-      initializeModeControls();
+      initializeModeControls(json);
     })
     .catch((error) => {
       console.error("Unable to load the game:", error);
@@ -121,9 +122,17 @@ function getRandomGameNumber(games) {
   ];
 }
 
-function initializeModeControls() {
+function initializeModeControls(games) {
   const dailyGameButton = document.getElementById("daily-game-button");
   const randomGameButton = document.getElementById("random-game-button");
+  const gameNumberInput = document.getElementById("game-number-input");
+  const playGameButton = document.getElementById("play-game-button");
+  const gameNumberError = document.getElementById("game-number-error");
+  const availableGameNumbers = Object.keys(games)
+    .filter((key) => /^game-\d+$/.test(key))
+    .map((key) => Number(key.slice(5)));
+
+  gameNumberInput.setAttribute("max", Math.max(...availableGameNumbers));
 
   if (isRandomMode) {
     dailyGameButton.classList.remove("hide");
@@ -138,6 +147,34 @@ function initializeModeControls() {
     sessionStorage.removeItem("randomState");
     window.location.assign(`${window.location.pathname}?mode=random`);
   });
+
+  playGameButton.addEventListener("click", playSpecificGame);
+  gameNumberInput.addEventListener("keydown", (event) => {
+    if (event.key === "Enter") {
+      playSpecificGame();
+    }
+  });
+
+  function playSpecificGame() {
+    const requestedGameNumber = Number(gameNumberInput.value);
+    if (
+      !Number.isInteger(requestedGameNumber) ||
+      !games[`game-${requestedGameNumber}`]
+    ) {
+      gameNumberError.classList.remove("hide");
+      return;
+    }
+
+    gameNumberError.classList.add("hide");
+    navigateToSpecificGame(requestedGameNumber);
+  }
+}
+
+function navigateToSpecificGame(gameNumber) {
+  sessionStorage.removeItem("randomState");
+  window.location.assign(
+    `${window.location.pathname}?mode=random&game=${gameNumber}`
+  );
 }
 
 /*
@@ -145,20 +182,22 @@ function initializeModeControls() {
 */
 
 function initializeGame() {
+  const hasStoredStats = localStorage.getItem(statsStorageKey) !== null;
+
   //Reset game state and track new game if user last played on a previous day
   if (gameState.gameNumber !== activeGameNumber) {
-    if (!isRandomMode && gameState.hasWon === false) {
+    if (gameState.hasWon === false) {
       userStats.currentStreak = 0;
     }
     gameState.gameNumber = activeGameNumber;
     gameState.guesses = [];
     gameState.hasWon = false;
 
-    if (!isRandomMode) {
-      userStats.numGames++;
-      localStorage.setItem("stats", JSON.stringify(userStats));
-    }
+    userStats.numGames++;
+    saveStats();
     saveGameState();
+  } else if (isRandomMode && !hasStoredStats) {
+    migrateExistingRandomGameStats();
   }
 
   displayProductCard();
@@ -169,6 +208,23 @@ function initializeGame() {
     addEventListeners();
   } else {
     convertToShareButton();
+  }
+}
+
+function migrateExistingRandomGameStats() {
+  userStats.numGames = 1;
+
+  if (gameState.hasWon) {
+    userStats.numWins = 1;
+    userStats.currentStreak = 1;
+    userStats.maxStreak = 1;
+    userStats.winsInNum[gameState.guesses.length - 1] = 1;
+  }
+
+  saveStats();
+
+  if (gameState.hasWon || gameState.guesses.length === 6) {
+    recordGameResult(gameState.hasWon ? "won" : "lost");
   }
 }
 
@@ -209,7 +265,9 @@ function updateGameBoard() {
 
 function updateGuessStat() {
   const guessStats = document.getElementById("game-stats");
-  const modeLabel = isRandomMode ? "Random item · " : "";
+  const modeLabel = isRandomMode
+    ? `Game #${activeGameNumber} · `
+    : `Daily #${activeGameNumber} · `;
   if (gameState.hasWon) {
     guessStats.innerHTML = `<center>${modeLabel}You win! Congratulations!🎉</center>`;
     guessStats.innerHTML += `<center>The price was $${productPrice}</center>`;
@@ -462,27 +520,25 @@ function calculatePercent(guess) {
 */
 
 function gameWon() {
-  if (!isRandomMode) {
-    userStats.numWins++;
-    userStats.currentStreak++;
-    userStats.winsInNum[gameState.guesses.length - 1]++;
-    if (userStats.currentStreak > userStats.maxStreak) {
-      userStats.maxStreak = userStats.currentStreak;
-    }
-    localStorage.setItem("stats", JSON.stringify(userStats));
+  userStats.numWins++;
+  userStats.currentStreak++;
+  userStats.winsInNum[gameState.guesses.length - 1]++;
+  if (userStats.currentStreak > userStats.maxStreak) {
+    userStats.maxStreak = userStats.currentStreak;
   }
+  saveStats();
   gameState.hasWon = true;
 
   saveGameState();
+  recordGameResult("won");
   removeEventListeners();
   convertToShareButton();
 }
 
 function gameLost() {
-  if (!isRandomMode) {
-    userStats.currentStreak = 0;
-    localStorage.setItem("stats", JSON.stringify(userStats));
-  }
+  userStats.currentStreak = 0;
+  saveStats();
+  recordGameResult("lost");
 
   removeEventListeners();
   convertToShareButton();
@@ -490,6 +546,24 @@ function gameLost() {
 
 function saveGameState() {
   gameStateStorage.setItem(gameStateStorageKey, JSON.stringify(gameState));
+}
+
+function saveStats() {
+  localStorage.setItem(statsStorageKey, JSON.stringify(userStats));
+}
+
+function recordGameResult(result) {
+  const gameHistory = JSON.parse(localStorage.getItem("gameHistory")) || [];
+  gameHistory.unshift({
+    gameNumber: activeGameNumber,
+    productName,
+    mode: isRandomMode ? "random" : "daily",
+    result,
+    guesses: gameState.guesses.length,
+    completedAt: new Date().toISOString(),
+  });
+
+  localStorage.setItem("gameHistory", JSON.stringify(gameHistory.slice(0, 100)));
 }
 
 /*
@@ -528,10 +602,16 @@ function switchState(event) {
   }
 
   function renderStats() {
-    title.innerHTML = `GAME <span class="costco-blue">STATS</span>`;
+    title.innerHTML = isRandomMode
+      ? `RANDOM <span class="costco-blue">STATS</span>`
+      : `GAME <span class="costco-blue">STATS</span>`;
+    if (isRandomMode) {
+      title.classList.add("info-title");
+    }
 
     renderStatistics();
     graphDistribution();
+    renderGameHistory();
 
     overlayElem.style.display = "flex";
 
@@ -556,7 +636,6 @@ function switchState(event) {
     }
 
     function graphDistribution() {
-      console.log("here");
       userStats.winsInNum.forEach((value, index) => {
         const graphElem = document.getElementById(`graph-${index + 1}`);
         if (userStats.numWins === 0) {
@@ -567,6 +646,52 @@ function switchState(event) {
           }%`;
         }
         graphElem.innerHTML = `${value}`;
+      });
+    }
+
+    function renderGameHistory() {
+      const gameHistoryElem = document.getElementById("game-history");
+      const gameHistory =
+        JSON.parse(localStorage.getItem("gameHistory")) || [];
+      gameHistoryElem.innerHTML = "";
+
+      if (gameHistory.length === 0) {
+        const emptyHistoryElem = document.createElement("p");
+        emptyHistoryElem.classList.add("empty-history");
+        emptyHistoryElem.textContent = "Complete a game to start your history.";
+        gameHistoryElem.appendChild(emptyHistoryElem);
+        return;
+      }
+
+      gameHistory.slice(0, 20).forEach((historyEntry) => {
+        const historyRow = document.createElement("div");
+        const replayButton = document.createElement("button");
+        const historyDetails = document.createElement("div");
+        const resultLabel = historyEntry.result === "won" ? "Won" : "Lost";
+        const modeLabel = historyEntry.mode === "daily" ? "Daily" : "Random";
+        const guessLabel =
+          historyEntry.result === "won"
+            ? `${historyEntry.guesses}/6 guesses`
+            : "X/6 guesses";
+
+        historyRow.classList.add("history-row");
+        replayButton.classList.add("history-replay-button");
+        historyDetails.classList.add("history-details");
+        replayButton.textContent = `#${historyEntry.gameNumber}`;
+        replayButton.setAttribute(
+          "aria-label",
+          `Replay game ${historyEntry.gameNumber}`
+        );
+        replayButton.addEventListener("click", () => {
+          navigateToSpecificGame(historyEntry.gameNumber);
+        });
+        historyDetails.textContent = `${historyEntry.productName} · ${modeLabel} · ${resultLabel} · ${guessLabel} · ${new Date(
+          historyEntry.completedAt
+        ).toLocaleDateString()}`;
+
+        historyRow.appendChild(replayButton);
+        historyRow.appendChild(historyDetails);
+        gameHistoryElem.appendChild(historyRow);
       });
     }
   }

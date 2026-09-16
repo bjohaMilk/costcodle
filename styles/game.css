@@ -55,7 +55,37 @@
 #game-mode-controls {
   display: flex;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
+}
+
+#game-number-controls {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-bottom: 4px;
+}
+
+#game-number-controls label {
+  font-size: 20px;
+}
+
+#game-number-input {
+  width: 80px;
+  padding: 3px 6px;
+
+  font-family: "VT323", monospace;
+  font-size: 20px;
+
+  border: 1px solid gray;
+  border-radius: 5px;
+  background-color: white;
+}
+
+.game-number-error {
+  margin-bottom: 4px;
+
+  font-size: 18px;
+  color: rgb(180, 20, 30);
 }
 
 .game-mode-button {
@@ -76,6 +106,10 @@
 }
 
 .game-mode-button.hide {
+  display: none;
+}
+
+.game-number-error.hide {
   display: none;
 }
 

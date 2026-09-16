@@ -105,3 +105,52 @@
   height: 26px;
   margin-bottom: 15px;
 }
+
+#history-section {
+  width: 100%;
+  padding-top: 12px;
+  padding-bottom: 16px;
+
+  border-top: 2px solid gray;
+}
+
+#history-section > p {
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+#game-history {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.history-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+
+  padding: 7px;
+
+  border-radius: 6px;
+  background-color: rgb(205, 205, 205);
+}
+
+.history-replay-button {
+  min-width: 62px;
+  padding: 5px 7px;
+
+  font-family: "VT323", monospace;
+  font-size: 20px;
+
+  cursor: pointer;
+  color: white;
+  border: none;
+  border-radius: 5px;
+  background-color: rgb(0, 96, 169);
+}
+
+.history-details,
+.empty-history {
+  font-size: 18px;
+}

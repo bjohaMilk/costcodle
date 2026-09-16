@@ -58,9 +58,13 @@ If you guess within 5% of the target price, you win!
 A new COSTCODLE is available every day!
 
 Want another round? Use **Random Item** to play any product from the included
-Costco food database without affecting your daily statistics or streak.
+Costco food database. Random games have their own statistics and streaks, kept
+separate from the daily game statistics.
 Random games also have stable links, such as `?mode=random&game=123`, so a
-specific item can be replayed or shared.
+specific item can be replayed or shared. The Game # control opens any game in
+the database, and completed games appear in Game History with a replay button.
+History is recorded locally from the first game completed after this feature is
+installed.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
