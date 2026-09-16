@@ -131,8 +131,12 @@ function initializeModeControls(games) {
   const availableGameNumbers = Object.keys(games)
     .filter((key) => /^game-\d+$/.test(key))
     .map((key) => Number(key.slice(5)));
+  const minimumGameNumber = Math.min(...availableGameNumbers);
+  const maximumGameNumber = Math.max(...availableGameNumbers);
 
-  gameNumberInput.setAttribute("max", Math.max(...availableGameNumbers));
+  gameNumberInput.setAttribute("min", minimumGameNumber);
+  gameNumberInput.setAttribute("max", maximumGameNumber);
+  gameNumberError.textContent = `Enter a game number between ${minimumGameNumber} and ${maximumGameNumber}.`;
 
   if (isRandomMode) {
     dailyGameButton.classList.remove("hide");

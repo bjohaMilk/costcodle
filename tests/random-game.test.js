@@ -249,6 +249,12 @@ test("the game number control rejects unavailable games", async () => {
 
   assert.equal(location.assigned, null);
   assert.equal(elements.get("game-number-error").classList.contains("hide"), false);
+  assert.equal(
+    elements.get("game-number-error").textContent,
+    "Enter a game number between 1 and 3399."
+  );
+  assert.equal(elements.get("game-number-input").min, 1);
+  assert.equal(elements.get("game-number-input").max, 3399);
 });
 
 test("existing random progress is migrated into random statistics", async () => {
