@@ -6,6 +6,7 @@
 let productName;
 let productPrice;
 let productImage;
+let activeGameNumber;
 
 //Timeout IDs
 let shakeTimeout;
@@ -18,7 +19,11 @@ let warningTimeout;
 
 //The day Costcodle was launched. Used to find game number each day
 const costcodleStartDate = new Date("09/21/2023");
-const gameNumber = getGameNumber();
+const dailyGameNumber = getGameNumber();
+const urlParams = new URLSearchParams(window.location.search);
+const isRandomMode = urlParams.get("mode") === "random";
+const gameStateStorage = isRandomMode ? sessionStorage : localStorage;
+const gameStateStorageKey = isRandomMode ? "randomState" : "state";
 
 //Elements with event listeners to play the game
 const input = document.getElementById("guess-input");
@@ -40,7 +45,7 @@ const userStats = JSON.parse(localStorage.getItem("stats")) || {
 };
 
 //User game state
-const gameState = JSON.parse(localStorage.getItem("state")) || {
+let gameState = JSON.parse(gameStateStorage.getItem(gameStateStorageKey)) || {
   gameNumber: -1,
   guesses: [],
   hasWon: false,
@@ -53,25 +58,86 @@ const gameState = JSON.parse(localStorage.getItem("state")) || {
 playGame();
 
 function playGame() {
-  fetchGameData(getGameNumber());
+  fetchGameData();
 }
 
 /*
   Acquiring Game Data
 */
 
-//Fetches the current day's game data from the json and starts game
-function fetchGameData(gameNumber) {
+//Fetches the selected game data from the json and starts the game
+function fetchGameData() {
   fetch("./games.json")
     .then((response) => response.json())
     .then((json) => {
-      productName = json[`game-${gameNumber}`].name;
-      productPrice = json[`game-${gameNumber}`].price;
-      productPrice = Number(productPrice.slice(1, productPrice.length));
-      productImage = json[`game-${gameNumber}`].image;
+      activeGameNumber = isRandomMode
+        ? getRandomGameNumber(json)
+        : dailyGameNumber;
+
+      const game = json[`game-${activeGameNumber}`];
+      if (!game) {
+        throw new Error(`Game ${activeGameNumber} is unavailable.`);
+      }
+
+      productName = game.name;
+      productPrice = Number(game.price.replace(/[$,]/g, ""));
+      productImage = game.image;
+
+      if (isRandomMode) {
+        const randomGameUrl = new URL(window.location.href);
+        randomGameUrl.searchParams.set("game", activeGameNumber);
+        window.history.replaceState({}, "", randomGameUrl);
+      }
 
       initializeGame();
+      initializeModeControls();
+    })
+    .catch((error) => {
+      console.error("Unable to load the game:", error);
+      document.getElementById("game-stats").textContent =
+        "Unable to load this game. Please try again.";
     });
+}
+
+function getRandomGameNumber(games) {
+  const requestedGameNumber = Number(urlParams.get("game"));
+  if (
+    Number.isInteger(requestedGameNumber) &&
+    games[`game-${requestedGameNumber}`]
+  ) {
+    return requestedGameNumber;
+  }
+
+  if (games[`game-${gameState.gameNumber}`]) {
+    return gameState.gameNumber;
+  }
+
+  const availableGameNumbers = Object.keys(games)
+    .filter((key) => /^game-\d+$/.test(key))
+    .map((key) => Number(key.slice(5)));
+
+  return availableGameNumbers[
+    Math.floor(Math.random() * availableGameNumbers.length)
+  ];
+}
+
+function initializeModeControls() {
+  const dailyGameButton = document.getElementById("daily-game-button");
+  const randomGameButton = document.getElementById("random-game-button");
+
+  if (isRandomMode) {
+    dailyGameButton.classList.remove("hide");
+    randomGameButton.textContent = "NEW RANDOM ITEM";
+  }
+
+  dailyGameButton.addEventListener("click", () => {
+    window.location.assign(window.location.pathname);
+  });
+
+  randomGameButton.addEventListener("click", () => {
+    sessionStorage.removeItem("randomState");
+    window.location.assign(`${window.location.pathname}?mode=random`);
+  });
 }
 
 /*
@@ -80,17 +146,19 @@ function fetchGameData(gameNumber) {
 
 function initializeGame() {
   //Reset game state and track new game if user last played on a previous day
-  if (gameState.gameNumber !== gameNumber) {
-    if (gameState.hasWon === false) {
+  if (gameState.gameNumber !== activeGameNumber) {
+    if (!isRandomMode && gameState.hasWon === false) {
       userStats.currentStreak = 0;
     }
-    gameState.gameNumber = gameNumber;
+    gameState.gameNumber = activeGameNumber;
     gameState.guesses = [];
     gameState.hasWon = false;
-    userStats.numGames++;
 
-    localStorage.setItem("stats", JSON.stringify(userStats));
-    localStorage.setItem("state", JSON.stringify(gameState));
+    if (!isRandomMode) {
+      userStats.numGames++;
+      localStorage.setItem("stats", JSON.stringify(userStats));
+    }
+    saveGameState();
   }
 
   displayProductCard();
@@ -122,6 +190,7 @@ function displayProductCard() {
   //Create a new image element to dynamically store game image
   const productImageElement = document.createElement("img");
   productImageElement.src = productImage;
+  productImageElement.alt = productName;
   productImageElement.setAttribute("id", "product-image");
 
   //Add created image to the image container
@@ -140,17 +209,18 @@ function updateGameBoard() {
 
 function updateGuessStat() {
   const guessStats = document.getElementById("game-stats");
+  const modeLabel = isRandomMode ? "Random item · " : "";
   if (gameState.hasWon) {
-    guessStats.innerHTML = `<center>You win! Congratulations!🎉</center>`;
+    guessStats.innerHTML = `<center>${modeLabel}You win! Congratulations!🎉</center>`;
     guessStats.innerHTML += `<center>The price was $${productPrice}</center>`;
     return;
   }
 
   if (gameState.guesses.length === 6) {
-    guessStats.innerHTML = `<center>Better luck next time!</center>`;
+    guessStats.innerHTML = `<center>${modeLabel}Better luck next time!</center>`;
     guessStats.innerHTML += `<center>The price was $${productPrice}</center>`;
   } else {
-    guessStats.innerHTML = `Guess: ${gameState.guesses.length + 1}/6`;
+    guessStats.innerHTML = `${modeLabel}Guess: ${gameState.guesses.length + 1}/6`;
   }
 }
 
@@ -202,7 +272,9 @@ function handleInput() {
 }
 
 function copyStats() {
-  let output = `Costcodle #${gameNumber}`;
+  let output = isRandomMode
+    ? `Costcodle Random #${activeGameNumber}`
+    : `Costcodle #${activeGameNumber}`;
   if (!gameState.hasWon) {
     output += ` X/6\n`;
   } else {
@@ -233,6 +305,10 @@ function copyStats() {
     output += `\n`;
   });
 
+  const shareUrl = isRandomMode
+    ? `${window.location.origin}${window.location.pathname}?mode=random&game=${activeGameNumber}`
+    : `${window.location.origin}${window.location.pathname}`;
+
   const isMobile =
     navigator.userAgent.match(/Android/i) ||
     navigator.userAgent.match(/webOS/i) ||
@@ -250,12 +326,12 @@ function copyStats() {
         .share({
           title: "COSTCODLE",
           text: output,
-          url: "https://costcodle.com",
+          url: shareUrl,
         })
         .catch((error) => console.error("Share failed:", error));
     }
   } else {
-    output += `https://costcodle.com`;
+    output += shareUrl;
     navigator.clipboard.writeText(output);
     displayToast();
   }
@@ -330,7 +406,7 @@ function checkGuess(guess) {
   }
 
   gameState.guesses.push(guessObj);
-  localStorage.setItem("state", JSON.stringify(gameState));
+  saveGameState();
 
   displayGuess(guessObj);
 
@@ -386,27 +462,34 @@ function calculatePercent(guess) {
 */
 
 function gameWon() {
-  userStats.numWins++;
-  userStats.currentStreak++;
-  userStats.winsInNum[gameState.guesses.length - 1]++;
-  if (userStats.currentStreak > userStats.maxStreak) {
-    userStats.maxStreak = userStats.currentStreak;
+  if (!isRandomMode) {
+    userStats.numWins++;
+    userStats.currentStreak++;
+    userStats.winsInNum[gameState.guesses.length - 1]++;
+    if (userStats.currentStreak > userStats.maxStreak) {
+      userStats.maxStreak = userStats.currentStreak;
+    }
+    localStorage.setItem("stats", JSON.stringify(userStats));
   }
   gameState.hasWon = true;
 
-  localStorage.setItem("state", JSON.stringify(gameState));
-  localStorage.setItem("stats", JSON.stringify(userStats));
+  saveGameState();
   removeEventListeners();
   convertToShareButton();
 }
 
 function gameLost() {
-  userStats.currentStreak = 0;
-
-  localStorage.setItem("stats", JSON.stringify(userStats));
+  if (!isRandomMode) {
+    userStats.currentStreak = 0;
+    localStorage.setItem("stats", JSON.stringify(userStats));
+  }
 
   removeEventListeners();
   convertToShareButton();
+}
+
+function saveGameState() {
+  gameStateStorage.setItem(gameStateStorageKey, JSON.stringify(gameState));
 }
 
 /*

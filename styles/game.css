@@ -52,6 +52,33 @@
   margin-bottom: 12px;
 }
 
+#game-mode-controls {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.game-mode-button {
+  padding: 5px 12px;
+
+  font-family: "VT323", monospace;
+  font-size: 20px;
+
+  cursor: pointer;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  background-color: rgb(0, 96, 169);
+}
+
+.game-mode-button:hover {
+  background-color: rgba(0, 96, 169, 0.8);
+}
+
+.game-mode-button.hide {
+  display: none;
+}
+
 #guesses-container {
   display: flex;
   flex-direction: column;

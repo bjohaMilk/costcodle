@@ -57,6 +57,11 @@ If you guess within 5% of the target price, you win!
 
 A new COSTCODLE is available every day!
 
+Want another round? Use **Random Item** to play any product from the included
+Costco food database without affecting your daily statistics or streak.
+Random games also have stable links, such as `?mode=random&game=123`, so a
+specific item can be replayed or shared.
+
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
 ### Built With
